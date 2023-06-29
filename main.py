@@ -7,6 +7,10 @@ from models.small_dataset_vit import SmallDataVit
 from models.timm_vit import Timm_Vit
 from train.trainer import ClassifiedTrainer
 from data.classification_dataset import ClassificationDataset, DataLoader
+from utils.finetune import FineTuneBatchSizeFinder, FineTuneLearningRateFinder
+from utils.prune import compute_amount
+
+
 import lightning.pytorch as pl
 from lightning.pytorch.utilities.model_summary import ModelSummary
 from lightning.pytorch.profilers import AdvancedProfiler
@@ -15,8 +19,10 @@ from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from lightning.pytorch.callbacks import StochasticWeightAveraging
 from lightning.pytorch.tuner import Tuner
 from lightning.pytorch.callbacks import ModelPruning
-from utils.finetune import FineTuneBatchSizeFinder, FineTuneLearningRateFinder
-from utils.prune import compute_amount
+from lightning.pytorch.callbacks import DeviceStatsMonitor
+from lightning.pytorch.callbacks import RichProgressBar
+from lightning.pytorch.callbacks.progress.rich_progress import RichProgressBarTheme
+
 ## Only for RTX 40 Series that has tensor cores
 torch.set_float32_matmul_precision('high')
 
@@ -28,6 +34,7 @@ def ArgumentParsers():
     ## dataset
     parser.add_argument("--root_path", type=str, default=r"/mnt/d/datasets/K2_datasets/9")
     parser.add_argument("--labels", type=str, default="CP00,CP03,CP06,CP08,CP09,DR02,IT03,IT08,IT09")
+    parser.add_argument("--num_classes", type=int, default=9)
     parser.add_argument("--batch_size", type=int, default=64)
     parser.add_argument("--accumulate_grad_batches", type=int, default=1, help="help divide the big batchsize to small K batchsize to avoid memory overhead.")
     parser.add_argument("--load_size", type=int, default=224)
@@ -36,7 +43,6 @@ def ArgumentParsers():
     ## Models
     parser.add_argument("--image_size", type=int, default=224)
     parser.add_argument("--patch_size", type=int, default=32)
-    parser.add_argument("--num_classes", type=int, default=9)
     parser.add_argument("--dim", type=int, default=1024)
     parser.add_argument("--depth", type=int, default=6)
     parser.add_argument("--heads", type=int, default=16)
@@ -48,8 +54,9 @@ def ArgumentParsers():
     parser.add_argument("--dev", action='store_true', help='Help you fast run a loop of your train schedule')
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--weight_decay", type=float, default=1e-2)
-    parser.add_argument("--max_epochs", type=int, default=300)
+    parser.add_argument("--max_epochs", type=int, default=200)
     parser.add_argument("--resume", nargs='?', const=True, default=False, help='resume most recent training')
+    parser.add_argument("--precision", type=int, default=32, help="Mixed Precision of the model, input: [16|32]")
     parser.add_argument("--patience", type=int, default=10, help='Early stopping patience')
     parser.add_argument("--optimizer", type=str, default="Adam", help="[Adam|AdamW|Lion|]")
     parser.add_argument("--stochastic_weight_averaging", action='store_true', default=False, help='swa help to generalize model')
@@ -65,6 +72,9 @@ def ArgumentParsers():
     parser.add_argument("--save_onnx", action='store_true', help="Save onnx model")
     parser.add_argument("--save_torch", action='store_true', help="Save onnx model")
     parser.add_argument("--pruning", action='store_true', help="Enable pruning during training to monomize the model.")
+
+    ## Others
+    parser.add_argument("--device_monitor", action='store_true', help="Set the monitor of device")
 
     ## Parse the user inputs and defaults (returns a argparse.Namespace)
     args = parser.parse_args()
@@ -96,7 +106,7 @@ if __name__=='__main__':
         classifier.load_from_checkpoint(args.load_ckpt_path)
     optimizer = classifier.configure_optimizers()
     
-    ## Trainer
+    ## Creat Trainer
     callback_list = []
     if args.stochastic_weight_averaging:
         SWA_callback = StochasticWeightAveraging(swa_lrs=args.swa_lr)
@@ -112,9 +122,27 @@ if __name__=='__main__':
     checkpoint_callback = ModelCheckpoint(dirpath=args.save_ckpt_path, filename='{epoch}-{val_loss:.2f}-{val_precision:.2f}', monitor="val_loss", mode="min", save_last=True)
     callback_list.append(checkpoint_callback)
     # Set prune of minize the model
-    callback_list.append(callbacks=[ModelPruning("l1_unstructured", amount=compute_amount)])
+    callback_list.append(ModelPruning("l1_unstructured", amount=compute_amount))
     # Check the bottleneck of the trainer
     profiler = AdvancedProfiler(dirpath=args.save_ckpt_path, filename="perf_logs")
+    # Set the monitor of device
+    if args.device_monitor:
+        callback_list.append(DeviceStatsMonitor())
+    # Set progress bar
+    # progress_bar = RichProgressBar(
+    #     theme=RichProgressBarTheme(
+    #         description="green_yellow",
+    #         progress_bar="green1",
+    #         progress_bar_finished="green1",
+    #         progress_bar_pulse="#6206E0",
+    #         batch_progress="green_yellow",
+    #         time="grey82",
+    #         processing_speed="grey82",
+    #         metrics="grey82",
+    #     )
+    # )
+    # callback_list.append(progress_bar)
+    callback_list.append(RichProgressBar())
     # Set the details of the trainer
     trainer = pl.Trainer(fast_dev_run=args.dev,
                          profiler=profiler,
@@ -124,7 +152,8 @@ if __name__=='__main__':
                          devices=args.devices, 
                          max_epochs=args.max_epochs, 
                          default_root_dir=args.save_ckpt_path, 
-                         callbacks=callback_list)
+                         callbacks=callback_list,
+                         precision=args.precision)
     
 
     ## Tune parameters

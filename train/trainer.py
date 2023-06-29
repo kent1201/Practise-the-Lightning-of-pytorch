@@ -18,17 +18,23 @@ class ClassifiedTrainer(pl.LightningModule):
         self.lr = self.args.lr
         self.criterion = nn.CrossEntropyLoss()
         self.label_count = len(self.args.labels.split(","))
+
+         ## Example of input, willn be used in deploy onnx model, if save_onnx is used. 
+        self.example_input_array = torch.Tensor(1, 3, args.image_size, args.image_size)
+
+        ## close automatic_optimization if you have many optimizers need to process by yourself.
+        # self.automatic_optimization = False
+        
         # self.train_metrics = ClassificationMetrics(num_classes=self.label_count, task="multiclass")
         # self.val_metrics = ClassificationMetrics(num_classes=self.label_count, task="multiclass")
         # self.test_metrics = ClassificationMetrics(num_classes=self.label_count, task="multiclass")
-        ## Example of input, willn be used in deploy onnx model, if save_onnx is used. 
-        self.example_input_array = torch.Tensor(1, 3, args.image_size, args.image_size)
         self.train_precision = torchmetrics.Precision(task="multiclass", num_classes=self.label_count)
         self.train_recall = torchmetrics.Recall(task="multiclass", num_classes=self.label_count)
         self.val_precision = torchmetrics.Precision(task="multiclass", num_classes=self.label_count)
         self.val_recall = torchmetrics.Recall(task="multiclass", num_classes=self.label_count)
         self.test_precision = torchmetrics.Precision(task="multiclass", num_classes=self.label_count)
         self.test_recall = torchmetrics.Recall(task="multiclass", num_classes=self.label_count)
+        
 
     def forward(self, input):
         preds = self.model(input)
