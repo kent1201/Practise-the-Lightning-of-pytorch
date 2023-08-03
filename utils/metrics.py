@@ -1,5 +1,9 @@
 import torch.nn as nn
-# import our library
+import numpy as np
+from numpy import cov
+from scipy.linalg import sqrtm
+from numpy import trace
+from numpy import iscomplexobj
 import torchmetrics
 
 class ClassificationMetrics(nn.Module):
@@ -20,3 +24,18 @@ class ClassificationMetrics(nn.Module):
         precision_all = self.precision.compute()
         recall_all = self.recall.compute()
         return {"acc": acc_all, "precision": precision_all, "recall": recall_all}
+    
+def FID_Score(feature1, feature2):
+    # calculate mean and covariance statistics
+    mu1, sigma1 = feature1.mean(axis=0), cov(feature1, rowvar=False)
+    mu2, sigma2 = feature2.mean(axis=0), cov(feature2, rowvar=False)
+    # calculate sum squared difference between means
+    ssdiff = np.sum((mu1 - mu2)**2.0)
+    # calculate sqrt of product between cov
+    covmean = sqrtm(sigma1.dot(sigma2))
+    # check and correct imaginary numbers from sqrt
+    if iscomplexobj(covmean):
+        covmean = covmean.real
+    # calculate score
+    fid = ssdiff + trace(sigma1 + sigma2 - 2.0 * covmean)
+    return fid

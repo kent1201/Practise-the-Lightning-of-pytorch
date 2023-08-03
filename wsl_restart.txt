@@ -1,0 +1,1 @@
+taskkill /f /im wslservice.exe

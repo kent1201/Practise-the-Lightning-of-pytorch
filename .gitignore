@@ -1,1 +1,12 @@
 Exp/
+*.zip
+K2/AI_Model/*
+*.onnx
+*.pth
+__pycache__/
+/data/__pycache__
+/K2/__pycache__
+/model/__pycache__
+/train/__pycache__
+/utils/__pycache__
+datasets/*
