@@ -11,13 +11,19 @@ from albumentations.pytorch import ToTensorV2
 
 from utils.utils import GetDataPath
 
+reference_path = r"D:\datasets\K2_datasets\CIMS_230804_v3.6.3"
+
+
 def DataTransform(args, mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5], mode='train'):
-    reference_image_path_list = GetDataPath(os.path.join(args.root_path, "Train"))
+    global reference_path
+    if not reference_path:
+        reference_path = args.root_path
+    reference_image_path_list = GetDataPath(os.path.join(reference_path, "Train"))
     # mean: [0.4804353415966034, 0.48068004846572876, 0.48095497488975525]    std: [0.15915930271148682, 0.15888161957263947, 0.15881265699863434]
     if mode == "train":
         transform = A.Compose([A.CLAHE(p=0.01), 
                                A.Resize(height=args.load_size, width=args.load_size),
-                               A.augmentations.domain_adaptation.PixelDistributionAdaptation(reference_image_path_list, transform_type='minmax'),
+                            #    A.augmentations.domain_adaptation.PixelDistributionAdaptation(reference_image_path_list, transform_type='minmax'),
                                A.RandomCrop(height=args.crop_size, width=args.crop_size),
                                A.HorizontalFlip(p=0.5),
                                A.VerticalFlip(p=0.5),
@@ -32,8 +38,9 @@ def DataTransform(args, mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5], mode='train')
                             ])
     else:
         transform = A.Compose([A.Resize(height=args.load_size, width=args.load_size),
+                            #    A.augmentations.domain_adaptation.PixelDistributionAdaptation(reference_image_path_list, transform_type='minmax'),
                             #    A.augmentations.domain_adaptation.HistogramMatching(reference_image_path_list),
-                               A.augmentations.domain_adaptation.PixelDistributionAdaptation(reference_image_path_list, transform_type='minmax'),
+                            #    A.augmentations.domain_adaptation.FDA(reference_image_path_list, p=1, read_fn=lambda x: x),
                                A.Normalize(mean=(mean[0], mean[1], mean[2]), std=(std[0], std[1], std[2])),
                                ToTensorV2()
                             ])
@@ -78,3 +85,26 @@ def compute_mean_std(data_path: str, resize=224, data_fmt=[".png", ".bmp", ".jpg
     gc.collect()
     print("mean: {}\tstd: {}".format(mean, std))
     return mean, std
+
+
+if __name__=="__main__":
+    from PIL import Image
+
+    def GetDataPath(data_dir, data_fmt=[".png", ".bmp", ".jpg", ".JPG", ".JPEG"]):
+        """
+        data_dir(str): images directory path
+        data_fmt(list): the data format want to get. default: [".png", ".bmp", ".jpg", ".JPG", ".JPEG"]
+        """
+        data_path = list()
+        for dirPath, dirNames, fileNames in os.walk(data_dir):
+            for f in fileNames:
+                if os.path.splitext(f)[1] in data_fmt:
+                    data_path.append(os.path.join(dirPath, f))
+        return data_path
+
+    reference_image_path_list = GetDataPath(os.path.join(r"D:\datasets\K2_datasets\CIMS_ModelB_v2_2", "Train"))
+    a_transform = A.augmentations.domain_adaptation.PixelDistributionAdaptation(reference_image_path_list, transform_type='minmax') # A.augmentations.domain_adaptation.PixelDistributionAdaptation(reference_image_path_list, transform_type='minmax')
+    image_path = r"D:\datasets\K2_datasets\CIMS_ModelB_v2_2\Test\CP08\Null_6-HL-J_22350729_22350729002_6.jpg"
+    org_image = Image.open(image_path)
+    new_image = Image.fromarray(a_transform(image=np.asarray(org_image))["image"])
+    new_image.save(r"D:\datasets\K2_datasets\CIMS_ModelB_v2_2\Test\CP08\Convert_Null_6-HL-J_22350729_22350729002_6.jpg")

@@ -35,7 +35,9 @@ class ClassificationDataset(pl.LightningDataModule):
         self.data_dir = self.args.root_path
         self.batch_size = self.args.batch_size     
         self.data_fmt = [".png", ".bmp", ".jpg", ".JPG", ".JPEG"]
-        self.mean, self.std = compute_mean_std(self.data_dir, self.args.load_size, self.data_fmt)
+        # self.mean, self.std = compute_mean_std(os.path.join(self.data_dir, 'train'), self.args.load_size, self.data_fmt)
+        self.mean = [0.5667182803153992, 0.5667171478271484, 0.5666833519935608]
+        self.std = [0.15075330436229706, 0.14988024532794952, 0.1496531218290329]
         self.save_hyperparameters()
         
     

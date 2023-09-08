@@ -1,6 +1,7 @@
 Exp/
 *.zip
 K2/AI_Model/*
+K2/*.7z
 *.onnx
 *.pth
 __pycache__/

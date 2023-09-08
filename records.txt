@@ -1,0 +1,39 @@
+=======在舊資料上進行訓練，在新資料上進行測試=======
+None:
+│         test_loss         │     4.960257530212402     │
+│      test_precision       │    0.13846154510974884    │
+│        test_recall        │    0.13846154510974884    │
+
+HistogramMatching:
+│         test_loss         │     4.187685012817383     │
+│      test_precision       │    0.16923077404499054    │
+│        test_recall        │    0.16923077404499054    │
+
+PixelDistributionAdaptation
+│         test_loss         │    2.9430556297302246     │
+│      test_precision       │    0.20000000298023224    │
+│        test_recall        │    0.20000000298023224    │
+
+FDA
+
+
+Combine HistogramMatching & PixelDistributionAdaptation
+│         test_loss         │    2.7957184314727783     │
+│      test_precision       │    0.1538461595773697     │
+│        test_recall        │    0.1538461595773697     │
+
+Combine PixelDistributionAdaptation & HistogramMatching
+│         test_loss         │     4.170510292053223     │
+│      test_precision       │    0.1230769231915474     │
+│        test_recall        │    0.1230769231915474     │
+
+=======在經過 PixelDistributionAdaptation 轉換後的舊資料(參考新資料的Train)上進行訓練，在新資料上(Test)進行測試=======
+
+None:
+
+
+PixelDistributionAdaptation:
+│         test_loss         │    1.9718883037567139     │
+│      test_precision       │    0.49253731966018677    │
+│        test_recall        │    0.49253731966018677    |
+

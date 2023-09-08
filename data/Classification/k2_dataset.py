@@ -4,6 +4,7 @@ import torch.utils.data as data
 from PIL import Image
 import numpy as np
 import torchvision.transforms as transforms
+import cv2
 
 class K2Dataset(data.Dataset):
     def __init__(self, args, mode, transforms=None):
@@ -11,7 +12,10 @@ class K2Dataset(data.Dataset):
         self.mode = mode
         self.alb_transforms = transforms
         self.data_fmt = [".png", ".bmp", ".jpg", ".JPG", ".JPEG"]
-        self.data_dir = self.args.root_path
+        if self.mode != "train":
+            self.data_dir = r"D:\datasets\K2_datasets\CIMS_230829"
+        else:
+            self.data_dir = self.args.root_path
         self.data_path = None
         for item in os.listdir(self.data_dir):
             if item.lower() == self.mode:

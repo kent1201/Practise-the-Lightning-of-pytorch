@@ -7,6 +7,7 @@ import lightning.pytorch as pl
 from utils.optimizers import LionOptimizer
 # from timm_vis.methods import grad_cam
 import torchmetrics
+from torchmetrics.classification import MulticlassConfusionMatrix
 from models import *
 
 
@@ -25,6 +26,7 @@ class Classifier(pl.LightningModule):
 
         
         self.model = CLASSIFICATIONMODELLIST[self.model](args=args)
+        print(self.model)
         
 
          ## Example of input, willn be used in deploy onnx model, if save_onnx is used. 
@@ -42,6 +44,7 @@ class Classifier(pl.LightningModule):
         self.val_recall = torchmetrics.Recall(task="multiclass", average='micro', num_classes=self.label_count, num_labels=self.label_count, threshold=0.5)
         self.test_precision = torchmetrics.Precision(task="multiclass", average='micro', num_classes=self.label_count, num_labels=self.label_count, threshold=0.5)
         self.test_recall = torchmetrics.Recall(task="multiclass", average='micro', num_classes=self.label_count, num_labels=self.label_count, threshold=0.5)
+        self.test_confusion_matrix = MulticlassConfusionMatrix(num_classes=self.label_count)
         
         self.save_hyperparameters(ignore=['model', 'train_precision', 'train_recall', 'val_precision', 'val_recall', 'test_precision', 'test_recall'])
 
@@ -98,20 +101,12 @@ class Classifier(pl.LightningModule):
         self.log('lr', self.lr, on_step=False, on_epoch=True, prog_bar=True, batch_size=self.batch_size)
 
         return {"loss": loss, "preds": y, "target": target}
-    
-    # def validation_step_end(self, outputs):
-    #     ## Calculate metrics
-    #     results = self.val_metrics(outputs["preds"], outputs["target"])
-    #     self.log('val_acc', results["acc"], on_step=True, on_epoch=True)
-    #     self.log('val_precision', results["precision"], on_step=True, on_epoch=True)
-    #     self.log('val_recall', results["recall"], on_step=True, on_epoch=True)
 
     # def on_validation_epoch_end(self):
     #     ## Calculate metrics
-    #     results = self.val_metrics.Compute()
-    #     self.log('val_acc_epoch', results["acc"], on_step=False, on_epoch=True)
-    #     self.log('val_precision_epoch', results["precision"], on_step=False, on_epoch=True)
-    #     self.log('val_recall_epoch', results["recall"], on_step=False, on_epoch=True)
+    #     fig_, ax_ = self.val_confusion_matrix.plot(labels=self.args.labels.split(","))
+    #     fig_.savefig(os.path.join(self.args.save_ckpt_path, "val_confusion_matrix.png"))
+    #     # plt.close(fig_)
 
     def test_step(self, batch, batch_idx):
         # training_step defines the train loop.
@@ -128,24 +123,17 @@ class Classifier(pl.LightningModule):
         max_targets = torch.argmax(target, dim=1)
         self.test_precision(preds, max_targets)
         self.test_recall(preds, max_targets)
+        self.test_confusion_matrix.update(preds, max_targets)
         self.log('test_precision', self.test_precision, on_step=False, on_epoch=True, prog_bar=True, batch_size=self.batch_size)
         self.log('test_recall', self.test_recall, on_step=False, on_epoch=True, prog_bar=True, batch_size=self.batch_size)
-
+        
         return {"loss": loss, "preds": y, "target": target}
     
-    # def test_step_end(self, outputs):
-    #     ## Calculate metrics
-    #     results = self.test_metrics(outputs["preds"], outputs["target"])
-    #     self.log('test_acc', results["acc"], on_step=True, on_epoch=False)
-    #     self.log('test_precision', results["precision"], on_step=True, on_epoch=False)
-    #     self.log('test_recall', results["recall"], on_step=True, on_epoch=False)
-    
-    # def on_test_epoch_end(self):
-    #     ## Calculate metrics
-    #     results = self.test_metrics.Compute()
-    #     self.log('test_acc_epoch', results["acc"], on_step=False, on_epoch=True)
-    #     self.log('test_precision_epoch', results["precision"], on_step=False, on_epoch=True)
-    #     self.log('test_recall_epoch', results["recall"], on_step=False, on_epoch=True)
+    def on_test_epoch_end(self):
+        ## Calculate metrics
+        fig_, ax_ = self.test_confusion_matrix.plot(labels=self.args.labels.split(","))
+        fig_.savefig(os.path.join(self.args.save_ckpt_path, "test_confusion_matrix.png"))
+        # plt.close(fig_)
 
     def predict_step(self, batch, batch_idx, dataloader_idx=0):
         # training_step defines the train loop.

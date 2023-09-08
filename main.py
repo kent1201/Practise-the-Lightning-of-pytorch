@@ -23,6 +23,8 @@ from lightning.pytorch.callbacks import DeviceStatsMonitor
 from lightning.pytorch.callbacks import RichProgressBar
 from lightning.pytorch.callbacks.progress.rich_progress import RichProgressBarTheme
 
+import matplotlib.pyplot as plt
+
 
 ## Only for RTX 40 Series that has tensor cores
 torch.set_float32_matmul_precision('high')
@@ -32,31 +34,32 @@ def ArgumentParsers():
     parser = ArgumentParser()
     ## base
     parser.add_argument("--devices", type=int, default=1)
-    parser.add_argument("--task", type=str, default="classification", help="[classification]")
+    parser.add_argument("--task", type=str, default="classification", help="[classification|defect_gan]")
     parser.add_argument("--mode", type=str, default="fit", help="[fit|train|test]")
     ## dataset
-    parser.add_argument("--root_path", type=str, default=r"D:\datasets\K2_datasets\CIMS_ModelB_v2_2")
-    parser.add_argument("--labels", type=str, default="CP00,CP03,CP06,CP08,CP09,DR02,IT03,IT08,IT09")
-    parser.add_argument("--num_classes", type=int, default=9)
+    parser.add_argument("--root_path", type=str, default=r"D:\datasets\K2_datasets\CIMS_230829")
+    parser.add_argument("--labels", type=str, default="'CP03,CP06,CP08,CP09,DR02,IT03,IT07,IT08,IT09,PASSCP06,PASSDIRTY,PASSOTHER,PASSOXDATION,PASSSCRATCHES,SHORTCP06,SHORTOTHER")
+    parser.add_argument("--num_classes", type=int, default=16)
     parser.add_argument("--batch_size", type=int, default=64)
     parser.add_argument("--accumulate_grad_batches", type=int, default=1, help="help divide the big batchsize to small K batchsize to avoid memory overhead.")
-    parser.add_argument("--load_size", type=int, default=224)
-    parser.add_argument("--crop_size", type=int, default=224)
+    parser.add_argument("--load_size", type=int, default=512)
+    parser.add_argument("--crop_size", type=int, default=512)
     parser.add_argument("--num_workers", type=int, default=4)
     parser.add_argument("--num_splits", nargs='?', const=True, default=False, help='number of folds you want to split, only used when k-fold cross validation')
     parser.add_argument("--k_folds", nargs='?', const=True, default=False, help='number of ration of train and val, only used when k-fold cross validation')
-    parser.add_argument("--random_seed", type=int, default=0)
+    parser.add_argument("--random_seed", type=int, default=21)
     ## Models
-    parser.add_argument("--image_size", type=int, default=224, help="image size for Vit-yptorch, not for timm model")
+    parser.add_argument("--image_size", type=int, default=512, help="image size for Vit-pytorch, not for timm model")
     parser.add_argument("--patch_size", type=int, default=32)
     parser.add_argument("--dim", type=int, default=1024)
     parser.add_argument("--depth", type=int, default=6)
     parser.add_argument("--heads", type=int, default=16)
     parser.add_argument("--mlp_dim", type=int, default=2048)
-    parser.add_argument("--save_ckpt_path", type=str, default=r".\Exp\davit_tiny.msft_in1k")
+    parser.add_argument("--save_ckpt_path", type=str, default=r".\Exp\cs3darknet_focus_m.c2ns_in1k")
     parser.add_argument("--load_ckpt_path", type=str)
-    parser.add_argument('--model', type=str, default="Timm_Vit", help="[Timm_Vit|DeepViT|SimpleVit|SmallDataVit]")
-    parser.add_argument("--timm_model", type=str, default=r"davit_tiny.msft_in1k", help="Only used when model_name is Timm_Vit")
+    parser.add_argument("--load_sala_ckpt_path", type=str)
+    parser.add_argument('--model', type=str, default="Timm_Vit", help="[Timm_Vit|DeepViT|SimpleVit|SmallDataVit|SALA]")
+    parser.add_argument("--timm_model", type=str, default=r"cs3darknet_focus_m.c2ns_in1k", help="Only used when model_name is Timm_Vit")
     parser.add_argument("--loss", type=str, default="CrossEntropy", help="[CrossEntropy|Focal|SigmoidFocal]")
     ## Train
     parser.add_argument("--dev", action='store_true', help='Help you fast run a loop of your train schedule')
@@ -68,7 +71,7 @@ def ArgumentParsers():
     parser.add_argument("--max_epochs", type=int, default=100)
     parser.add_argument("--resume", nargs='?', const=True, default=False, help='resume most recent training')
     parser.add_argument("--precision", type=str, default="32", help="Mixed Precision of the model, input: [16-mixed|32]")
-    parser.add_argument("--patience", type=int, default=20, help='Early stopping patience')
+    parser.add_argument("--patience", type=int, default=15, help='Early stopping patience')
     parser.add_argument("--scheduler", type=str, default="StepLR", help="[StepLR|ReduceLROnPlateau|ExponentialLR|CosineAnnealingLR|CosineAnnealingWarmRestarts]")
     parser.add_argument("--lr_factor", type=float, default=0.1, help="learning rate gamma of scheduler")
     parser.add_argument("--lr_step_size", type=int, default=20, help="learning rate step size of scheduler")
@@ -81,7 +84,7 @@ def ArgumentParsers():
 
     ## Deploy
     parser.add_argument("--save_onnx", action='store_true', help="Save onnx model")
-    parser.add_argument("--save_torch", action='store_true', help="Save onnx model")
+    parser.add_argument("--save_torch", action='store_true', help="Save torch model")
     parser.add_argument("--pruning", action='store_true', help="Enable pruning during training to monomize the model.")
 
     ## Others
@@ -206,7 +209,7 @@ def test(args):
                     )
     dataset.setup("test")
     trainer.test(model=model, ckpt_path=args.load_ckpt_path, datamodule=dataset)
-    
+
     return trainer, model, dataset
     
     
@@ -217,6 +220,8 @@ if __name__=='__main__':
 
     num_splits = int(args.num_splits) if isinstance(args.num_splits, str) else None
     k_folds = int(args.k_folds) if isinstance(args.k_folds, str) else None
+
+    CheckSavePath(args.save_ckpt_path)
 
     
     trainer, model, dataset = None, None, None
