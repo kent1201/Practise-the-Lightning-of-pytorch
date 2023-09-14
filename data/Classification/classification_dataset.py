@@ -55,8 +55,8 @@ class ClassificationDataset(pl.LightningDataModule):
             self.val_transform = DataTransform(args=self.args, mean=self.mean, std=self.std, mode="val")
             self.val_dataset = K2Dataset(self.args, "val", self.val_transform)
         elif stage == "test":
-            self.val_transform = DataTransform(args=self.args, mean=self.mean, std=self.std, mode="val")
-            self.test_dataset = K2Dataset(self.args, "test", self.val_transform)
+            self.test_transform = DataTransform(args=self.args, mean=self.mean, std=self.std, mode="test")
+            self.test_dataset = K2Dataset(self.args, "test", self.test_transform)
         
         self.train_fold, self.val_fold = None, None
         if self.k_folds and stage !="test":

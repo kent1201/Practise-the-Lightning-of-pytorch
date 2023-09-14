@@ -4,18 +4,16 @@ import torch.utils.data as data
 from PIL import Image
 import numpy as np
 import torchvision.transforms as transforms
-import cv2
 
 class K2Dataset(data.Dataset):
     def __init__(self, args, mode, transforms=None):
         self.args = args
         self.mode = mode
         self.alb_transforms = transforms
+        self.mixup_interval = self.args.mixup_interval
+        self.mixup_alpha = self.args.mixup_alpha
         self.data_fmt = [".png", ".bmp", ".jpg", ".JPG", ".JPEG"]
-        if self.mode != "train":
-            self.data_dir = r"D:\datasets\K2_datasets\CIMS_230829"
-        else:
-            self.data_dir = self.args.root_path
+        self.data_dir = self.args.root_path
         self.data_path = None
         for item in os.listdir(self.data_dir):
             if item.lower() == self.mode:
@@ -48,8 +46,20 @@ class K2Dataset(data.Dataset):
         image_path, label = self.data_dict[index]["image_path"], self.data_dict[index]["label"]
         image = Image.open(image_path)
         target = torch.nn.functional.one_hot(torch.LongTensor([label]), len(self.labels_map.keys()))
+        target = target.type(torch.FloatTensor)
         if self.alb_transforms:
             image = self.alb_transforms(image=np.asarray(image))["image"]
+        ## MixUP
+        if self.mode == "train" and index > 0 and index % self.mixup_interval == 0:
+            mixup_idx = np.random.randint(0, len(self.data_dict)-1)
+            mixup_image_path, mixup_label = self.data_dict[mixup_idx]["image_path"], self.data_dict[mixup_idx]["label"]
+            mixup_image = Image.open(mixup_image_path)
+            mixup_target = torch.nn.functional.one_hot(torch.LongTensor([mixup_label]), len(self.labels_map.keys()))
+            if self.alb_transforms:
+                mixup_image = self.alb_transforms(image=np.asarray(mixup_image))["image"]
+            lam = np.random.beta(self.mixup_alpha, self.mixup_alpha)
+            image = lam * image + (1 - lam) * mixup_image
+            target = lam * target + (1 - lam) * mixup_target
 
         return image, target, image_path
               

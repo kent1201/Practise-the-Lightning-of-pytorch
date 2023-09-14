@@ -11,15 +11,16 @@ from albumentations.pytorch import ToTensorV2
 
 from utils.utils import GetDataPath
 
-reference_path = r"D:\datasets\K2_datasets\CIMS_230804_v3.6.3"
+reference_path = r"D:\datasets\K2_datasets\CIMS_230907\train\CP00"
 
 
 def DataTransform(args, mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5], mode='train'):
     global reference_path
     if not reference_path:
         reference_path = args.root_path
-    reference_image_path_list = GetDataPath(os.path.join(reference_path, "Train"))
+    reference_image_path_list = GetDataPath(reference_path)
     # mean: [0.4804353415966034, 0.48068004846572876, 0.48095497488975525]    std: [0.15915930271148682, 0.15888161957263947, 0.15881265699863434]
+    transform = None
     if mode == "train":
         transform = A.Compose([A.CLAHE(p=0.01), 
                                A.Resize(height=args.load_size, width=args.load_size),
@@ -30,9 +31,14 @@ def DataTransform(args, mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5], mode='train')
                                A.Perspective(p=0.5),
                                A.Transpose(p=0.2),
                                A.RandomGridShuffle(p=0.01),
-                               A.OneOf([A.ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.2, rotate_limit=45, p=0.2), A.Affine(p=0.2)]),
-                               A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.1),
-                               A.OneOf([A.Blur(p=0.01), A.MedianBlur(p=0.01)]),
+                               A.OneOf([A.ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.2, rotate_limit=45, p=0.2),
+                                        A.Affine(p=0.2)]),
+                               A.OneOf([A.augmentations.transforms.HueSaturationValue(hue_shift_limit=10, sat_shift_limit=15, val_shift_limit=15, always_apply=False, p=0.3),
+                                        A.RandomBrightnessContrast(brightness_limit=0.1, contrast_limit=0.1, p=0.3),
+                                        A.augmentations.transforms.RGBShift (r_shift_limit=5, g_shift_limit=5, b_shift_limit=5, always_apply=False, p=0.3)]),
+                               A.MedianBlur(always_apply=True),
+                            #    A.OneOf([A.Blur(p=0.9),
+                            #             A.MedianBlur(p=0.9)]),
                                A.Normalize(mean=(mean[0], mean[1], mean[2]), std=(std[0], std[1], std[2])),
                                ToTensorV2()
                             ])
@@ -41,6 +47,8 @@ def DataTransform(args, mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5], mode='train')
                             #    A.augmentations.domain_adaptation.PixelDistributionAdaptation(reference_image_path_list, transform_type='minmax'),
                             #    A.augmentations.domain_adaptation.HistogramMatching(reference_image_path_list),
                             #    A.augmentations.domain_adaptation.FDA(reference_image_path_list, p=1, read_fn=lambda x: x),
+                            #    A.OneOf([A.Blur(p=0.9), A.MedianBlur(p=0.9)]),
+                               A.MedianBlur(always_apply=True),
                                A.Normalize(mean=(mean[0], mean[1], mean[2]), std=(std[0], std[1], std[2])),
                                ToTensorV2()
                             ])

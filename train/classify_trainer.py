@@ -3,12 +3,14 @@ import sys
 import torch
 import torch.nn.functional as F
 from torch import optim, nn
+from utils.optimizers import NovoGrad
 import lightning.pytorch as pl
 from utils.optimizers import LionOptimizer
 # from timm_vis.methods import grad_cam
 import torchmetrics
 from torchmetrics.classification import MulticlassConfusionMatrix
 from models import *
+from matplotlib import pyplot as plt
 
 
 # define the LightningModule
@@ -42,6 +44,7 @@ class Classifier(pl.LightningModule):
         self.train_recall = torchmetrics.Recall(task="multiclass", average='micro', num_classes=self.label_count, num_labels=self.label_count, threshold=0.5)
         self.val_precision = torchmetrics.Precision(task="multiclass", average='micro', num_classes=self.label_count, num_labels=self.label_count, threshold=0.5)
         self.val_recall = torchmetrics.Recall(task="multiclass", average='micro', num_classes=self.label_count, num_labels=self.label_count, threshold=0.5)
+        self.val_confusion_matrix = MulticlassConfusionMatrix(num_classes=self.label_count)
         self.test_precision = torchmetrics.Precision(task="multiclass", average='micro', num_classes=self.label_count, num_labels=self.label_count, threshold=0.5)
         self.test_recall = torchmetrics.Recall(task="multiclass", average='micro', num_classes=self.label_count, num_labels=self.label_count, threshold=0.5)
         self.test_confusion_matrix = MulticlassConfusionMatrix(num_classes=self.label_count)
@@ -96,17 +99,19 @@ class Classifier(pl.LightningModule):
         max_targets = torch.argmax(target, dim=1)
         self.val_precision(preds, max_targets)
         self.val_recall(preds, max_targets)
+        self.val_confusion_matrix.update(preds, max_targets)
         self.log('val_precision', self.val_precision, on_step=False, on_epoch=True, prog_bar=True, batch_size=self.batch_size)
         self.log('val_recall', self.val_recall, on_step=False, on_epoch=True, prog_bar=True, batch_size=self.batch_size)
         self.log('lr', self.lr, on_step=False, on_epoch=True, prog_bar=True, batch_size=self.batch_size)
 
         return {"loss": loss, "preds": y, "target": target}
 
-    # def on_validation_epoch_end(self):
-    #     ## Calculate metrics
-    #     fig_, ax_ = self.val_confusion_matrix.plot(labels=self.args.labels.split(","))
-    #     fig_.savefig(os.path.join(self.args.save_ckpt_path, "val_confusion_matrix.png"))
-    #     # plt.close(fig_)
+    def on_validation_epoch_end(self):
+        ## Calculate metrics
+        fig_, ax_ = self.val_confusion_matrix.plot(labels=self.args.labels.split(","))
+        fig_.savefig(os.path.join(self.args.save_ckpt_path, "val_confusion_matrix.png"))
+        self.val_confusion_matrix.reset()
+        plt.close(fig_)
 
     def test_step(self, batch, batch_idx):
         # training_step defines the train loop.
@@ -133,7 +138,7 @@ class Classifier(pl.LightningModule):
         ## Calculate metrics
         fig_, ax_ = self.test_confusion_matrix.plot(labels=self.args.labels.split(","))
         fig_.savefig(os.path.join(self.args.save_ckpt_path, "test_confusion_matrix.png"))
-        # plt.close(fig_)
+        plt.close(fig_)
 
     def predict_step(self, batch, batch_idx, dataloader_idx=0):
         # training_step defines the train loop.
@@ -156,6 +161,10 @@ class Classifier(pl.LightningModule):
             ## Suggest the batch size of Lion at least 64
             self.lr = self.lr * 0.1
             optimizer = LionOptimizer(self.parameters(), lr=self.lr, weight_decay=self.args.weight_decay)
+        elif self.args.optimizer == 'NovoGrad':
+            ## Suggest the lr smaller 10x or 3x than lr of the Adam
+            ## Suggest the batch size of Lion at least 64
+            optimizer = NovoGrad(self.parameters(), lr=self.lr, betas=(0.95, 0.98), weight_decay=self.args.weight_decay*0.1)
         else:
             raise ValueError("Optimizer {} does not exist.".format(self.args.optimizer))
         

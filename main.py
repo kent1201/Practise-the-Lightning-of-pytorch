@@ -8,7 +8,7 @@ from data import CreateDataset
 from utils.finetune import FineTuneBatchSizeFinder, FineTuneLearningRateFinder
 from utils.prune import compute_amount
 from utils.data_visualization import DataVisualization
-from utils.utils import CheckSavePath
+from utils.utils import CheckSavePath, ListDir
 
 
 import lightning.pytorch as pl
@@ -37,8 +37,8 @@ def ArgumentParsers():
     parser.add_argument("--task", type=str, default="classification", help="[classification|defect_gan]")
     parser.add_argument("--mode", type=str, default="fit", help="[fit|train|test]")
     ## dataset
-    parser.add_argument("--root_path", type=str, default=r"D:\datasets\K2_datasets\CIMS_230829")
-    parser.add_argument("--labels", type=str, default="'CP03,CP06,CP08,CP09,DR02,IT03,IT07,IT08,IT09,PASSCP06,PASSDIRTY,PASSOTHER,PASSOXDATION,PASSSCRATCHES,SHORTCP06,SHORTOTHER")
+    parser.add_argument("--root_path", type=str, default=r"D:\datasets\K2_datasets\CIMS_230907")
+    parser.add_argument("--labels", type=str, default="CP00,CP03,CP08,CP09,DR02,IT03,IT07,IT08,IT09,PASSCP06,PASSDIRTY,PASSOTHER,PASSOXIDATION,PASSSCRATCHES,SHORTCP06,SHORTOTHER")
     parser.add_argument("--num_classes", type=int, default=16)
     parser.add_argument("--batch_size", type=int, default=64)
     parser.add_argument("--accumulate_grad_batches", type=int, default=1, help="help divide the big batchsize to small K batchsize to avoid memory overhead.")
@@ -48,22 +48,24 @@ def ArgumentParsers():
     parser.add_argument("--num_splits", nargs='?', const=True, default=False, help='number of folds you want to split, only used when k-fold cross validation')
     parser.add_argument("--k_folds", nargs='?', const=True, default=False, help='number of ration of train and val, only used when k-fold cross validation')
     parser.add_argument("--random_seed", type=int, default=21)
+    parser.add_argument("--mixup_interval", type=int, default=5)
+    parser.add_argument("--mixup_alpha", type=float, default=0.2)
     ## Models
-    parser.add_argument("--image_size", type=int, default=512, help="image size for Vit-pytorch, not for timm model")
+    parser.add_argument("--image_size", type=int, default=224, help="image size for Vit-pytorch, not for timm model")
     parser.add_argument("--patch_size", type=int, default=32)
     parser.add_argument("--dim", type=int, default=1024)
     parser.add_argument("--depth", type=int, default=6)
     parser.add_argument("--heads", type=int, default=16)
     parser.add_argument("--mlp_dim", type=int, default=2048)
-    parser.add_argument("--save_ckpt_path", type=str, default=r".\Exp\cs3darknet_focus_m.c2ns_in1k")
+    parser.add_argument("--save_ckpt_path", type=str, default=r".\Exp\convnextv2_tiny.fcmae_ft_in1k")
     parser.add_argument("--load_ckpt_path", type=str)
     parser.add_argument("--load_sala_ckpt_path", type=str)
     parser.add_argument('--model', type=str, default="Timm_Vit", help="[Timm_Vit|DeepViT|SimpleVit|SmallDataVit|SALA]")
-    parser.add_argument("--timm_model", type=str, default=r"cs3darknet_focus_m.c2ns_in1k", help="Only used when model_name is Timm_Vit")
+    parser.add_argument("--timm_model", type=str, default=r"convnextv2_tiny.fcmae_ft_in1k", help="Only used when model_name is Timm_Vit")
     parser.add_argument("--loss", type=str, default="CrossEntropy", help="[CrossEntropy|Focal|SigmoidFocal]")
     ## Train
     parser.add_argument("--dev", action='store_true', help='Help you fast run a loop of your train schedule')
-    parser.add_argument("--optimizer", type=str, default="Adam", help="[Adam|SGD|AdamW|NAdam|Lion|]")
+    parser.add_argument("--optimizer", type=str, default="Adam", help="[Adam|SGD|AdamW|NAdam|Lion|NovoGrad]")
     parser.add_argument("--flooding", nargs='?', const=True, default=False, help="Suggest: val_loss * 0.5. Do We Need Zero Training Loss After Achieving Zero Training Error? ICML, 2020")
     parser.add_argument("--lr", type=float, default=3e-4)
     parser.add_argument("--momentum", type=float, default=0.9)
@@ -71,7 +73,7 @@ def ArgumentParsers():
     parser.add_argument("--max_epochs", type=int, default=100)
     parser.add_argument("--resume", nargs='?', const=True, default=False, help='resume most recent training')
     parser.add_argument("--precision", type=str, default="32", help="Mixed Precision of the model, input: [16-mixed|32]")
-    parser.add_argument("--patience", type=int, default=15, help='Early stopping patience')
+    parser.add_argument("--patience", type=int, default=10, help='Early stopping patience')
     parser.add_argument("--scheduler", type=str, default="StepLR", help="[StepLR|ReduceLROnPlateau|ExponentialLR|CosineAnnealingLR|CosineAnnealingWarmRestarts]")
     parser.add_argument("--lr_factor", type=float, default=0.1, help="learning rate gamma of scheduler")
     parser.add_argument("--lr_step_size", type=int, default=20, help="learning rate step size of scheduler")
@@ -188,9 +190,14 @@ def test(args):
 
     ## Create Model
     model = CreateModel(args=args)
+    if not args.load_ckpt_path:
+        load_ckpt_path = os.path.join(args.save_ckpt_path, "last.ckpt")
+        model.load_from_checkpoint(load_ckpt_path)
+    if args.load_ckpt_path:
+        model.load_from_checkpoint(args.load_ckpt_path)
     # Print summary of model
-    summary = ModelSummary(model, max_depth=-1)
-    print(summary)
+    # summary = ModelSummary(model, max_depth=-1)
+    # print(summary)
 
     ## Creat Trainer
     callback_dict = CallBackDict(args)
@@ -208,7 +215,7 @@ def test(args):
                         precision=args.precision
                     )
     dataset.setup("test")
-    trainer.test(model=model, ckpt_path=args.load_ckpt_path, datamodule=dataset)
+    trainer.test(model=model, datamodule=dataset)
 
     return trainer, model, dataset
     
