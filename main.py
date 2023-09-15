@@ -57,11 +57,11 @@ def ArgumentParsers():
     parser.add_argument("--depth", type=int, default=6)
     parser.add_argument("--heads", type=int, default=16)
     parser.add_argument("--mlp_dim", type=int, default=2048)
-    parser.add_argument("--save_ckpt_path", type=str, default=r".\Exp\convnextv2_tiny.fcmae_ft_in1k")
+    parser.add_argument("--save_ckpt_path", type=str, default=r".\Exp\convnextv2_pico.fcmae_ft_in1k")
     parser.add_argument("--load_ckpt_path", type=str)
     parser.add_argument("--load_sala_ckpt_path", type=str)
     parser.add_argument('--model', type=str, default="Timm_Vit", help="[Timm_Vit|DeepViT|SimpleVit|SmallDataVit|SALA]")
-    parser.add_argument("--timm_model", type=str, default=r"convnextv2_tiny.fcmae_ft_in1k", help="Only used when model_name is Timm_Vit")
+    parser.add_argument("--timm_model", type=str, default=r"convnextv2_pico.fcmae_ft_in1k", help="Only used when model_name is Timm_Vit")
     parser.add_argument("--loss", type=str, default="CrossEntropy", help="[CrossEntropy|Focal|SigmoidFocal]")
     ## Train
     parser.add_argument("--dev", action='store_true', help='Help you fast run a loop of your train schedule')
