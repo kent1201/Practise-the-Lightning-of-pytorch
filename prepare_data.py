@@ -2,7 +2,6 @@ import os
 import shutil
 import random
 from tqdm import tqdm
-import cv2
 import numpy as np
 import albumentations as A
 from PIL import Image
@@ -17,10 +16,10 @@ transform = A.Compose([A.CLAHE(p=0.01),
                     A.HorizontalFlip(p=0.5),
                     A.VerticalFlip(p=0.5),
                     A.Perspective(p=0.5),
-                    A.Transpose(p=0.2),
-                    A.RandomGridShuffle(p=0.01),
-                    A.OneOf([A.ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.2, rotate_limit=45, p=0.2),
-                            A.Affine(p=0.2)]),
+                    A.Transpose(p=0.4),
+                    A.RandomGridShuffle(p=0.4),
+                    A.OneOf([A.ShiftScaleRotate(shift_limit=0.12, scale_limit=0.2, rotate_limit=45, p=0.5),
+                            A.Affine(p=0.5)]),
                 ])
 
 def DataAugmentation(data_dict, dst_img_dir, up_limit = 600, aug_ratio = 0.3):
@@ -117,6 +116,7 @@ def prepare_data(src_img_dir, dst_img_dir, split=0.8, limit_count=600):
     
     train_data_dict, val_data_dict, test_data_dict = train_val_test_split(src_img_list, split_ratio=split)
     train_data_dict = LimitSample(train_data_dict, limit_count=limit_count)
+    val_data_dict = LimitSample(val_data_dict, limit_count=round(limit_count * 0.5 * 0.25))
     DataAugmentation(train_data_dict, dst_img_dir, up_limit=limit_count)
 
     if len(train_data_dict):
@@ -152,10 +152,10 @@ def Histogram(img_dir):
 if __name__=='__main__':
 
     ## Prepare train/test
-    src_img_dir = r'D:\datasets\K2_datasets\CIMS_230907'
-    dst_img_dir = r'D:\datasets\K2_datasets\CIMS_230907'
+    src_img_dir = r'D:\Datasets\K2_datasets\dataset_230907\all'
+    dst_img_dir = r'D:\Datasets\K2_datasets\dataset_230907'
     # CheckSavePath(src_img_dir)
     # CheckSavePath(src_label_dir)
     CheckSavePath(dst_img_dir)
-    prepare_data(src_img_dir, dst_img_dir, split=0.8, limit_count=350)
+    prepare_data(src_img_dir, dst_img_dir, split=0.8, limit_count=500)
     Histogram(os.path.join(dst_img_dir, "train"))

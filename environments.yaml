@@ -190,4 +190,4 @@ dependencies:
       - xyzservices==2023.5.0
       - yarl==1.9.2
       - zipp==3.15.0
-prefix: C:\Users\KentTsai\miniconda3\envs\lightning-pytorch
+
