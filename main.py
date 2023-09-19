@@ -1,4 +1,5 @@
 import os
+import random
 import torch
 from argparse import ArgumentParser
 
@@ -9,7 +10,6 @@ from utils.finetune import FineTuneBatchSizeFinder, FineTuneLearningRateFinder
 from utils.prune import compute_amount
 from utils.data_visualization import DataVisualization
 from utils.utils import CheckSavePath, ListDir
-
 
 import lightning.pytorch as pl
 from lightning.pytorch.utilities.model_summary import ModelSummary
@@ -28,6 +28,8 @@ import matplotlib.pyplot as plt
 
 ## Only for RTX 40 Series that has tensor cores
 torch.set_float32_matmul_precision('high')
+
+random.seed(42)
 
 
 def ArgumentParsers():
@@ -57,17 +59,21 @@ def ArgumentParsers():
     parser.add_argument("--depth", type=int, default=6)
     parser.add_argument("--heads", type=int, default=16)
     parser.add_argument("--mlp_dim", type=int, default=2048)
-    parser.add_argument("--save_ckpt_path", type=str, default=r".\Exp\convnextv2_pico.fcmae_ft_in1k")
+    parser.add_argument("--save_ckpt_path", type=str, default=r".\Exp\davit_tiny.msft_in1k")
     parser.add_argument("--load_ckpt_path", type=str)
     parser.add_argument("--load_sala_ckpt_path", type=str)
     parser.add_argument('--model', type=str, default="Timm_Vit", help="[Timm_Vit|DeepViT|SimpleVit|SmallDataVit|SALA]")
-    parser.add_argument("--timm_model", type=str, default=r"convnextv2_pico.fcmae_ft_in1k", help="Only used when model_name is Timm_Vit")
-    parser.add_argument("--loss", type=str, default="CrossEntropy", help="[CrossEntropy|Focal|SigmoidFocal]")
+    parser.add_argument("--timm_model", type=str, default=r"davit_tiny.msft_in1k", help="Only used when model_name is Timm_Vit")
+    parser.add_argument("--loss", type=str, default="CrossEntropy", help="[CrossEntropy|Focal|SigmoidFocal|Poly1CrossEntropyLoss]")
+    parser.add_argument("--loss_with_cls_weight", nargs='?', const=True, default=False, help="the weight in different classes, now only support for Crossentropy loss. ex: 1.0,2.0,0.5,...")
+
     ## Train
     parser.add_argument("--dev", action='store_true', help='Help you fast run a loop of your train schedule')
     parser.add_argument("--optimizer", type=str, default="Adam", help="[Adam|SGD|AdamW|NAdam|Lion|NovoGrad]")
     parser.add_argument("--flooding", nargs='?', const=True, default=False, help="Suggest: val_loss * 0.5. Do We Need Zero Training Loss After Achieving Zero Training Error? ICML, 2020")
     parser.add_argument("--lr", type=float, default=3e-4)
+    parser.add_argument("--special_lr_factor", nargs='?', const=True, default=False, help="special learning rate factor (factor * --lr) for model.head.parameters, only support for timm model.")
+    parser.add_argument("--dropout", nargs='?', const=True, default=False, help="dropout range: 0.2~0.8")
     parser.add_argument("--momentum", type=float, default=0.9)
     parser.add_argument("--weight_decay", type=float, default=1e-2)
     parser.add_argument("--max_epochs", type=int, default=100)
@@ -77,10 +83,10 @@ def ArgumentParsers():
     parser.add_argument("--scheduler", type=str, default="StepLR", help="[StepLR|ReduceLROnPlateau|ExponentialLR|CosineAnnealingLR|CosineAnnealingWarmRestarts]")
     parser.add_argument("--lr_factor", type=float, default=0.1, help="learning rate gamma of scheduler")
     parser.add_argument("--lr_step_size", type=int, default=20, help="learning rate step size of scheduler")
-    parser.add_argument("--lr_cycle", type=int, default=10, help="learning rate cycle of scheduler")
+    parser.add_argument("--lr_cycle", type=int, default=20, help="learning rate cycle of scheduler")
     parser.add_argument("--stochastic_weight_averaging", action='store_true', default=False, help='swa help to generalize model')
     parser.add_argument("--swa_lr", type=float, default=1e-2, help='lr of swa help to generalize model, only used when --stochastic_weight_averaging')
-    parser.add_argument("--gradient_clip_val", type=float, default=0.5, help='gradient_clip to avoid exploding gradients. 0 means no clipped.')
+    parser.add_argument("--gradient_clip_val", type=float, default=0, help='gradient_clip to avoid exploding gradients. 0 means no clipped.')
     parser.add_argument("--tune", action='store_true', help='if called, Trainer will finetune the lr and batch size automatically. It\'s suitable for training model.')
     parser.add_argument("--finetune", action='store_true', help='if called, Trainer will finetune the lr and batch size each epoch automatically. It\'s suitable for finetuning model.')
 
@@ -111,8 +117,9 @@ def CallBackDict(args):
         call_back_dict["FineTuneLearningRateFinder"] = FineTuneLearningRateFinder(milestones=(5, 10))
         call_back_dict["FineTuneBatchSizeFinder"] = FineTuneBatchSizeFinder(milestones=(5, 10))
 
-    # Set factor of Early Stop 
-    call_back_dict["EarlyStopping"] = EarlyStopping(monitor="val_precision", min_delta=0.00, patience=args.patience, verbose=False, mode="max")
+    # Set factor of Early Stop
+    if not args.pruning:
+        call_back_dict["EarlyStopping"] = EarlyStopping(monitor="val_precision", min_delta=0.00, patience=args.patience, verbose=False, mode="max")
     
     # Set prune of minize the model
     if args.pruning:
@@ -180,6 +187,10 @@ def train(args):
                 datamodule=dataset,
                 ckpt_path=resume_ckpt
             )
+    ## Testing
+    dataset.setup("test")
+    trainer.test(model=model, datamodule=dataset)
+
     return trainer, model, dataset
     
 
@@ -236,7 +247,7 @@ if __name__=='__main__':
     if args.mode == "train" or args.mode == "fit":
         if not k_folds:
             trainer, model, dataset = train(args=args)
-            test(args=args)
+            # test(args=args)
         else: ## K-Fold training
             default_save_ckpt_path = args.save_ckpt_path
             for k in range(num_splits):
@@ -247,7 +258,7 @@ if __name__=='__main__':
                 args.save_ckpt_path = dst_file_path
                 
                 trainer, dataset = train(args=args)
-                test(args=args)
+                # test(args=args)
                 
                 with open(os.path.join(dst_file_path, "train.txt"), "w") as f:
                     for item in dataset.train_fold_data_list:

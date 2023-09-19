@@ -16,7 +16,13 @@ class Timm_Vit(nn.Module):
         super().__init__()
         self.args = args
         self.model_name = self.args.timm_model
-        self.model = timm.create_model(self.model_name, pretrained=True, num_classes=args.num_classes)
+        self.dropout_rate = 0.0
+        if self.args.dropout:
+            self.dropout_rate = float(self.args.dropout)
+        self.model = timm.create_model(self.model_name, 
+                                       pretrained=True, 
+                                       num_classes=args.num_classes, 
+                                       drop_rate=self.dropout_rate)
         # if self.model_name == "convnextv2_tiny.fcmae_ft_in1k":
         #     self.model.head.fc = nn.Linear(in_features=768, out_features=384, bias=True)
         #     self.relu = nn.ReLU(inplace=True)
@@ -35,10 +41,10 @@ class Timm_Vit(nn.Module):
 
 if __name__=='__main__':
     import torch
-    # ListModels(r"/mnt/d/Users/KentTsai/Documents/ViT_pytorch/timm_model_list.txt")
-    model = Timm_Vit()
+    ListModels(r"D:\Users\KentTsai\Documents\ViT_pytorch\timm_model_list.txt")
+    # model = Timm_Vit()
     
-    print(model)
-    input = torch.randn([1, 3, 224, 224])
-    output = model(input)
-    print(output.shape)
+    # print(model)
+    # input = torch.randn([1, 3, 224, 224])
+    # output = model(input)
+    # print(output.shape)
