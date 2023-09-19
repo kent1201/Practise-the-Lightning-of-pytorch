@@ -148,25 +148,57 @@ class Classifier(pl.LightningModule):
     def configure_optimizers(self):
         optimizer = None
         lr_scheduler = None
+        group_params = self.parameters()
+        if self.args.special_lr_factor:
+            params = list(filter(lambda kv: 'head' in kv[0], self.model.named_parameters()))
+            base_params = list(filter(lambda kv: 'head' not in kv[0], self.model.named_parameters()))
+            params = [item[1] for item in params]
+            base_params = [item[1] for item in base_params]
+            group_params = [
+                {'params': params, 'lr': self.lr*float(self.args.special_lr_factor)},
+                {'params': base_params, 'lr': self.lr},
+            ]
         if self.args.optimizer == 'Adam':
-            optimizer = optim.Adam(self.parameters(), lr=self.lr, weight_decay=self.args.weight_decay)
+            if self.args.special_lr_factor:
+                optimizer = optim.Adam(group_params, weight_decay=self.args.weight_decay)
+            else:
+                optimizer = optim.Adam(self.parameters(), lr=self.lr, weight_decay=self.args.weight_decay)
         elif self.args.optimizer == 'SGD':
-            optimizer = optim.SGD(self.parameters(), lr=self.lr*10, momentum=self.args.momentum,  weight_decay=self.args.weight_decay*10)
+            if self.args.special_lr_factor:
+                for param in group_params:
+                    param['lr'] = param['lr'] * 10
+                optimizer = optim.SGD(group_params, momentum=self.args.momentum,  weight_decay=self.args.weight_decay*10)
+            else:
+                optimizer = optim.SGD(self.parameters(), lr=self.lr*10, momentum=self.args.momentum,  weight_decay=self.args.weight_decay*10)
         elif self.args.optimizer == 'AdamW':
-            optimizer = optim.AdamW(self.parameters(), lr=self.lr, weight_decay=self.args.weight_decay)
+            if self.args.special_lr_factor:
+                optimizer = optim.AdamW(group_params, weight_decay=self.args.weight_decay)
+            else:
+                optimizer = optim.AdamW(self.parameters(), lr=self.lr, weight_decay=self.args.weight_decay)
         elif self.args.optimizer == 'NAdam':
-            optimizer = optim.NAdam(self.parameters(), lr=self.lr, weight_decay=self.args.weight_decay)
+            if self.args.special_lr_factor:
+                optimizer = optim.NAdam(group_params, weight_decay=self.args.weight_decay)
+            else:
+                optimizer = optim.NAdam(self.parameters(), lr=self.lr, weight_decay=self.args.weight_decay)
         elif self.args.optimizer == 'Lion':
             ## Suggest the lr smaller 10x or 3x than lr of the Adam
             ## Suggest the batch size of Lion at least 64
-            self.lr = self.lr * 0.1
-            optimizer = LionOptimizer(self.parameters(), lr=self.lr, weight_decay=self.args.weight_decay)
+            if self.args.special_lr_factor:
+                for param in group_params:
+                    param['lr'] = param['lr'] * 0.1
+                optimizer = LionOptimizer(group_params, weight_decay=self.args.weight_decay)
+            else:
+                optimizer = LionOptimizer(self.parameters(), lr=self.lr*0.1, weight_decay=self.args.weight_decay)
         elif self.args.optimizer == 'NovoGrad':
             ## Suggest the lr smaller 10x or 3x than lr of the Adam
             ## Suggest the batch size of Lion at least 64
-            optimizer = NovoGrad(self.parameters(), lr=self.lr, betas=(0.95, 0.98), weight_decay=self.args.weight_decay*0.1)
+            if self.args.special_lr_factor:
+                optimizer = NovoGrad(group_params, weight_decay=self.args.weight_decay)
+            else:
+                optimizer = NovoGrad(self.parameters(), lr=self.lr, betas=(0.95, 0.98), weight_decay=self.args.weight_decay*0.1)
         else:
             raise ValueError("Optimizer {} does not exist.".format(self.args.optimizer))
+
         
         if self.args.scheduler == 'ReduceLROnPlateau':
             lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=self.args.lr_factor, patience=10)

@@ -10,33 +10,32 @@ from matplotlib import pyplot as plt
 labels_list = ['CP00', 'CP03', 'CP08', 'CP09', 'DR02', 
                'IT03', 'IT07', 'IT08', 'IT09',
                'PASSCP06', 'PASSDIRTY', 'PASSOTHER', 'PASSOXIDATION', 'PASSSCRATCHES', 'SHORTCP06', 'SHORTOTHER']
-random.seed(21)
+random.seed(42)
 
-transform = A.Compose([A.CLAHE(p=0.01), 
+transform = A.Compose([ 
                     A.HorizontalFlip(p=0.5),
                     A.VerticalFlip(p=0.5),
                     A.Perspective(p=0.5),
-                    A.Transpose(p=0.4),
-                    A.RandomGridShuffle(p=0.4),
-                    A.OneOf([A.ShiftScaleRotate(shift_limit=0.12, scale_limit=0.2, rotate_limit=45, p=0.5),
-                            A.Affine(p=0.5)]),
+                    A.Transpose(p=0.3),
+                    A.RandomGridShuffle(p=0.3),
+                    A.OneOf([A.ShiftScaleRotate(shift_limit=0.1, scale_limit=0.1, rotate_limit=45, p=0.4),
+                            A.Affine(p=0.4)]),
                 ])
 
-def DataAugmentation(data_dict, dst_img_dir, up_limit = 600, aug_ratio = 0.3):
+def DataAugmentation(data_dict, dst_img_dir, up_limit = 600, aug_ratio = 0.3, mode='train'):
     global transform
     min_generate_iter = 0
     for key, value in data_dict.items():
         min_generate_iter = 0
         if len(value) < up_limit:
-            new_image_list = list()
-            min_generate_iter = min(up_limit - len(value), int(len(value) * 0.3))
+            min_generate_iter = min(up_limit - len(value), int(len(value) * aug_ratio))
             print("len(value): {}\tmin_generate_iter: {}".format(len(value), min_generate_iter))
             random.shuffle(value)
             print("Preparing the augmentation of {} data...".format(key))
             for new_image_index in tqdm(range(0, min_generate_iter)):
                 org_image = Image.open(value[new_image_index])
                 new_image = Image.fromarray(transform(image=np.asarray(org_image))["image"])
-                new_img_dir = os.path.join(dst_img_dir, "train", key)
+                new_img_dir = os.path.join(dst_img_dir, mode, key)
                 CheckSavePath(new_img_dir)
                 new_image_path = os.path.join(new_img_dir, "aug_"+os.path.basename(value[new_image_index]))
                 new_image.save(new_image_path)
@@ -97,15 +96,6 @@ def MoveData(data_dict, dst_img_dir, dir='train'):
             for file_path in values:
                 filename = os.path.basename(file_path)
                 save_path = os.path.join(save_dir, filename)
-                # try:
-                #     org_image = cv2.imread(file_path, cv2.IMREAD_UNCHANGED)
-                #     org_image = (org_image // 10) * 10
-                #     cv2.waitKey(300)
-                # except Exception as ex:
-                #     print("read {} failed. {}".format(file_path, ex))
-                #     continue
-                # cv2.imwrite(save_path, org_image, [int(cv2.IMWRITE_JPEG_QUALITY), 100])
-                # np.save(save_path, org_image)
                 shutil.copy(file_path, save_path)
                 print("Image: {} copy to {}".format(file_path, save_path))
 
@@ -116,7 +106,6 @@ def prepare_data(src_img_dir, dst_img_dir, split=0.8, limit_count=600):
     
     train_data_dict, val_data_dict, test_data_dict = train_val_test_split(src_img_list, split_ratio=split)
     train_data_dict = LimitSample(train_data_dict, limit_count=limit_count)
-    val_data_dict = LimitSample(val_data_dict, limit_count=round(limit_count * 0.5 * 0.25))
     DataAugmentation(train_data_dict, dst_img_dir, up_limit=limit_count)
 
     if len(train_data_dict):
@@ -159,3 +148,4 @@ if __name__=='__main__':
     CheckSavePath(dst_img_dir)
     prepare_data(src_img_dir, dst_img_dir, split=0.8, limit_count=500)
     Histogram(os.path.join(dst_img_dir, "train"))
+    Histogram(os.path.join(dst_img_dir, "val"))
