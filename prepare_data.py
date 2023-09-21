@@ -106,6 +106,7 @@ def prepare_data(src_img_dir, dst_img_dir, split=0.8, limit_count=600):
     
     train_data_dict, val_data_dict, test_data_dict = train_val_test_split(src_img_list, split_ratio=split)
     train_data_dict = LimitSample(train_data_dict, limit_count=limit_count)
+    val_data_dict = LimitSample(val_data_dict, limit_count=round(min([len(value) for value in val_data_dict.values()])*1.25))
     DataAugmentation(train_data_dict, dst_img_dir, up_limit=limit_count)
 
     if len(train_data_dict):

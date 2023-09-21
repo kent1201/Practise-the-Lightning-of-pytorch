@@ -3,7 +3,7 @@ import random
 import numpy as np
 from PIL import Image
 from tqdm import tqdm
-
+import cv2
 import torch
 import torchvision.transforms as transforms
 import albumentations as A
@@ -23,27 +23,28 @@ def DataTransform(args, mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5], mode='train')
     transform = None
     if mode == "train":
         transform = A.Compose([A.CLAHE(p=0.01), 
-                               A.Resize(height=args.load_size, width=args.load_size),
+                               A.Resize(height=args.load_size, width=args.load_size, interpolation=cv2.INTER_NEAREST),
                             #    A.augmentations.domain_adaptation.PixelDistributionAdaptation(reference_image_path_list, transform_type='minmax'),
-                               A.RandomCrop(height=args.crop_size, width=args.crop_size),
+                               A.CenterCrop(height=args.crop_size, width=args.crop_size),
                                A.HorizontalFlip(p=0.5),
                                A.VerticalFlip(p=0.5),
                                A.Perspective(p=0.5),
                                A.Transpose(p=0.4),
-                               A.RandomGridShuffle(p=0.4),
                                A.OneOf([A.ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.2, rotate_limit=45, p=0.2),
                                         A.Affine(p=0.2)]),
                                A.OneOf([A.augmentations.transforms.HueSaturationValue(hue_shift_limit=10, sat_shift_limit=15, val_shift_limit=15, always_apply=False, p=0.3),
                                         A.RandomBrightnessContrast(brightness_limit=0.1, contrast_limit=0.1, p=0.3),
                                         A.augmentations.transforms.RGBShift(r_shift_limit=5, g_shift_limit=5, b_shift_limit=5, always_apply=False, p=0.3)]),
                                A.MedianBlur(always_apply=True),
+                               A.RandomGridShuffle(p=0.4),
                             #    A.OneOf([A.Blur(p=0.9),
                             #             A.MedianBlur(p=0.9)]),
                                A.Normalize(mean=(mean[0], mean[1], mean[2]), std=(std[0], std[1], std[2])),
                                ToTensorV2()
                             ])
     else:
-        transform = A.Compose([A.Resize(height=args.load_size, width=args.load_size),
+        transform = A.Compose([A.Resize(height=args.load_size, width=args.load_size, interpolation=cv2.INTER_NEAREST),
+                               A.CenterCrop(height=args.crop_size, width=args.crop_size),
                             #    A.augmentations.domain_adaptation.PixelDistributionAdaptation(reference_image_path_list, transform_type='minmax'),
                             #    A.augmentations.domain_adaptation.HistogramMatching(reference_image_path_list),
                             #    A.augmentations.domain_adaptation.FDA(reference_image_path_list, p=1, read_fn=lambda x: x),

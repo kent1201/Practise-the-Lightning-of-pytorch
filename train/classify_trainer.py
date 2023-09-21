@@ -32,7 +32,7 @@ class Classifier(pl.LightningModule):
         
 
          ## Example of input, willn be used in deploy onnx model, if save_onnx is used. 
-        self.example_input_array = torch.Tensor(1, 3, self.args.image_size, self.args.image_size)
+        self.example_input_array = torch.Tensor(1, self.args.num_channels, self.args.crop_size, self.args.crop_size)
 
         ## close automatic_optimization if you have many optimizers need to process by yourself.
         # self.automatic_optimization = False

@@ -1,15 +1,16 @@
-python main.py --load_size 224 ^
---crop_size 224 ^
---batch_size 96 ^
---mode train ^
+python main.py --load_size 512 ^
+--crop_size 336 ^
+--batch_size 32 ^
+--mode fit ^
 --max_epochs 100 ^
 --accumulate_grad_batches 2 ^
---optimizer Lion ^
+--optimizer NovoGrad ^
 --precision 16-mixed ^
 --stochastic_weight_averaging ^
+--exponential_moving_average 0.9988 ^
 --analysis_method cams ^
 --loss CrossEntropy ^
---loss_with_cls_weight 1.5,0.5,1.5,2.0,1.0,2.5,2.5,1.0,2.5,1.0,1.5,5.0,1.0,1.5,1.0,1.0 ^
+--loss_with_cls_weight 1.5,0.5,1.5,2.0,3.0,2.5,2.5,1.0,2.5,1.0,1.5,5.0,1.0,1.5,1.0,1.0 ^
 --scheduler CosineAnnealingLR ^
 --dropout 0.5 ^
 --special_lr_factor 10
