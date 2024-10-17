@@ -1,0 +1,20 @@
+python main.py --load_size 256 \
+--task classification \
+--project animals_64classes \
+--root_path /workspace/Datasets/animals_64classes/Ver_001_20241015 \
+--devices 1 \
+--crop_size 224 \
+--num_classes 64 \
+--batch_size 24 \
+--accumulate_grad_batches 2 \
+--model Timm_Vit \
+--timm_model resnet50 \
+--mode fit \
+--max_epochs 15 \
+--patience 5 \
+--num_workers 2 \
+--optimizer Adam \
+--lr 0.0001 \
+--precision 32 \
+--loss CrossEntropy \
+--save_ckpt_path ./Exp/test003_241017

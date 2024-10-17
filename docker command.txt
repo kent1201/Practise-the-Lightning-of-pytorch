@@ -1,0 +1,15 @@
+## docker pull tensorflow images
+docker pull pytorch/pytorch:2.4.1-cuda11.8-cudnn9-runtime
+
+## Create and execute Docker File
+docker build -t my-pytorch-env .
+
+## Create container
+(bash)
+docker run -it --runtime=nvidia --shm-size=8g --name my-pytorch-env -v D:/Users/KentTsai/Documents/Projects/Practise-the-Lightning-of-pytorch-main:/workspace my-pytorch-env /bin/bash
+
+## Get into container
+docker exec -it <mycontainer> bash
+
+## Stop / Start container
+docker container stop / [start -ia] [container ID]

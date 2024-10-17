@@ -1,0 +1,20 @@
+python main.py --load_size 512 ^
+--task classification ^
+--project animals_64classes ^
+--root_path /workspace/Datasets/animals_64classes/Ver_001_20241015 ^
+--devices 0 ^
+--crop_size 512 ^
+--num_classes 64 ^
+--batch_size 24 ^
+--accumulate_grad_batches 2 ^
+--model Timm_Vit ^
+--timm_model res2net50_14w_8s.in1k ^
+--mode fit ^
+--max_epochs 50 ^
+--num_workers 0 ^
+--optimizer Adam ^
+--lr 0.0025 ^
+--precision 16-mixed ^
+--loss CrossEntropy ^
+--scheduler CosineAnnealingLR ^
+--special_lr_factor 10

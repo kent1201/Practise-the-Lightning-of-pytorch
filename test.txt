@@ -1,0 +1,4 @@
+python main.py --mode test --accumulate_grad_batches 2 --optimizer Lion --precision 16-mixed --stochastic_weight_averaging
+
+SALA:
+python main.py --mode test --accumulate_grad_batches 2 --precision 16-mixed --stochastic_weight_averaging --model SALA --load_sala_ckpt_path .\\K2\\AI_Model\\Model_B_v2.2\\BestOnnx.pth
